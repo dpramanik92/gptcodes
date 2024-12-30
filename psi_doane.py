@@ -1,45 +1,59 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import skew
 
-def calculate_psi_doane_bins(expected, actual):
+def calculate_psi(actual, expected, bins=10, is_categorical=False):
     """
-    Calculate the Population Stability Index (PSI) using Doane's rule for binning.
-    
-    Args:
-        expected (array-like): Expected distribution.
-        actual (array-like): Actual distribution.
-    
+    Calculate the Population Stability Index (PSI) between two distributions.
+
+    Parameters:
+    - actual: array-like, baseline distribution
+    - expected: array-like, comparison distribution
+    - bins: int, number of bins (only for numerical data)
+    - is_categorical: bool, whether the data is categorical
+
     Returns:
-        float: PSI value.
+    - psi: float, the PSI value
     """
-    # Calculate the number of bins using Doane's rule
-    n = len(expected)
-    g1 = skew(expected)  # Skewness of the expected data
-    k = int(1 + np.log2(n) + np.log2(1 + abs(g1) / np.sqrt(6 / n)))
+    if is_categorical:
+        # For categorical data, get unique categories
+        categories = list(set(actual) | set(expected))
+        
+        # Calculate proportions for each category
+        actual_counts = pd.Series(actual).value_counts(normalize=True).reindex(categories, fill_value=0)
+        expected_counts = pd.Series(expected).value_counts(normalize=True).reindex(categories, fill_value=0)
+        
+    else:
+        # For numerical data, define bin edges using the actual distribution
+        bin_edges = np.linspace(np.min(actual), np.max(actual), bins + 1)
+        
+        # Calculate proportions for each bin in both distributions
+        actual_counts, _ = np.histogram(actual, bins=bin_edges)
+        expected_counts, _ = np.histogram(expected, bins=bin_edges)
+        
+        # Convert counts to proportions
+        actual_counts = actual_counts / len(actual)
+        expected_counts = expected_counts / len(expected)
     
-    # Create bin edges using equal-width bins
-    bin_edges = np.linspace(min(min(expected), min(actual)), max(max(expected), max(actual)), k + 1)
+    # Avoid division by zero and log of zero
+    actual_proportions = np.where(actual_counts == 0, 1e-8, actual_counts)
+    expected_proportions = np.where(expected_counts == 0, 1e-8, expected_counts)
     
-    # Digitize the data into bins
-    expected_bins = np.digitize(expected, bin_edges, right=True)
-    actual_bins = np.digitize(actual, bin_edges, right=True)
+    # Calculate PSI for each category/bin
+    psi_values = (actual_proportions - expected_proportions) * np.log(actual_proportions / expected_proportions)
     
-    # Calculate percentage of observations in each bin
-    expected_perc = np.array([np.sum(expected_bins == i) for i in range(1, k + 1)]) / len(expected)
-    actual_perc = np.array([np.sum(actual_bins == i) for i in range(1, k + 1)]) / len(actual)
-    
-    # Avoid division by zero and log(0) by adding a small value
-    expected_perc = np.where(expected_perc == 0, 0.0001, expected_perc)
-    actual_perc = np.where(actual_perc == 0, 0.0001, actual_perc)
-    
-    # Calculate PSI
-    psi = np.sum((expected_perc - actual_perc) * np.log(expected_perc / actual_perc))
-    
-    return psi, k
+    # Sum up PSI values for the total PSI
+    psi = np.sum(psi_values)
+    return psi
 
 # Example usage
-expected_data = np.random.normal(50, 10, 1000)  # Expected data
-actual_data = np.random.normal(52, 15, 1000)    # Actual data
-psi_value, num_bins = calculate_psi_doane_bins(expected_data, actual_data)
-print(f"PSI using Doane's rule: {psi_value:.4f}, Number of bins: {num_bins}")
+
+# Numerical example
+actual_num = np.random.normal(50, 10, 1000)  # Baseline distribution
+expected_num = np.random.normal(52, 12, 1000)  # Comparison distribution
+
+psi_num = calculate_psi(actual_num, expected_num, bins=10, is_categorical=False)
+print(f"Numerical PSI: {psi_num:.4f}")
+
+# Categorical example
+actual_cat = np.random.choice(['A', 'B', 'C', 'D'], size=1000, p=[0.4, 0.3, 0.2, 0.1])
+expected_cat = np.random.choice(['A', 'B', 'C', 'D'], size=1000, p=[
