@@ -73,6 +73,17 @@ ax2.set_yticks(yticks)
 ax2.set_yticklabels(yticklabels)
 
 
+# Get legend handles and labels
+handles, labels = ax.get_legend_handles_labels()
+
+# Sort legend labels alphabetically
+sorted_pairs = sorted(zip(labels, handles))  # Sort based on labels
+sorted_labels, sorted_handles = zip(*sorted_pairs)  # Unzip into separate lists
+
+# Apply sorted legend
+ax.legend(sorted_handles, sorted_labels, loc="upper right")
+
+
 # Remove top and right spines for bottom subplots
 for ax in [ax3, ax4]:
     ax.spines["top"].set_visible(False)
